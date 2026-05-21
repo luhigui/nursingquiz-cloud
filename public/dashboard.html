@@ -204,23 +204,14 @@ async function createBank() {
   if (!title) { showToast('El título es requerido'); return; }
 
   try {
-    if (editId) {
-      await fetch(API + '/banks/' + editId, {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify({ title, description })
-      });
-    } else {
-      await fetch(API + '/banks', {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({ title, description })
-      });
-    }
+    const url = editId ? API + '/banks/' + editId : API + '/banks';
+    const method = editId ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: getHeaders(), body: JSON.stringify({ title, description }) });
+    if (!res.ok) { const data = await res.json(); showToast(data.error || 'Error al guardar'); return; }
     closeModal();
-    loadBanks();
+    await loadBanks();
   } catch (err) {
-    showToast('Error al guardar');
+    showToast('Error de conexión');
   }
 }
 

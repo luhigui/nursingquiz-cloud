@@ -255,29 +255,27 @@ async function saveQuestion() {
   const body = { question, options, correct, explanation };
 
   try {
-    if (editingQId) {
-      await fetch(API + '/banks/' + bankId + '/questions/' + editingQId, {
-        method: 'PUT', headers: getHeaders(), body: JSON.stringify(body)
-      });
-    } else {
-      await fetch(API + '/banks/' + bankId + '/questions', {
-        method: 'POST', headers: getHeaders(), body: JSON.stringify(body)
-      });
-    }
+    const url = editingQId
+      ? API + '/banks/' + bankId + '/questions/' + editingQId
+      : API + '/banks/' + bankId + '/questions';
+    const method = editingQId ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: getHeaders(), body: JSON.stringify(body) });
+    if (!res.ok) { const data = await res.json(); showToast(data.error || 'Error al guardar'); return; }
     closeQuestionModal();
     loadBank();
   } catch (err) {
-    showToast('Error al guardar');
+    showToast('Error de conexión');
   }
 }
 
 async function deleteQuestion(qid) {
   if (!confirm('¿Eliminar esta pregunta?')) return;
   try {
-    await fetch(API + '/banks/' + bankId + '/questions/' + qid, { method: 'DELETE', headers: getHeaders() });
+    const res = await fetch(API + '/banks/' + bankId + '/questions/' + qid, { method: 'DELETE', headers: getHeaders() });
+    if (!res.ok) { showToast('Error al eliminar'); return; }
     loadBank();
   } catch (err) {
-    showToast('Error al eliminar');
+    showToast('Error de conexión');
   }
 }
 
