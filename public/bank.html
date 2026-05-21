@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Banco - NursingQuiz Cloud</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; min-height: 100vh; }
+.topbar { background: white; padding: 16px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 10; }
+.topbar a { color: #2563eb; text-decoration: none; font-size: 1.5rem; line-height: 1; }
+.topbar h1 { font-size: 1.125rem; color: #111827; flex: 1; }
+.container { max-width: 800px; margin: 0 auto; padding: 20px; }
+.btn { padding: 10px 16px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+.btn-primary { background: #2563eb; color: white; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-danger { background: #dc2626; color: white; }
+.btn-danger:hover { opacity: 0.9; }
+.btn-outline { background: transparent; color: #374151; border: 1px solid #d1d5db; }
+.btn-outline:hover { background: #f3f4f6; }
+.btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+.question-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.question-text { font-size: 1rem; font-weight: 600; color: #111827; margin-bottom: 8px; line-height: 1.4; }
+.option { padding: 8px 12px; margin: 4px 0; border-radius: 8px; font-size: 0.875rem; }
+.option-correct { background: #dcfce7; color: #166534; }
+.option-wrong { background: #f3f4f6; color: #374151; }
+.explanation { margin-top: 8px; padding: 8px; background: #fef9c3; border-radius: 8px; font-size: 0.8rem; color: #854d0e; }
+.question-actions { margin-top: 8px; display: flex; gap: 8px; }
+.empty { text-align: center; padding: 40px 20px; color: #6b7280; }
+.bank-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: #6b7280; margin-bottom: 16px; }
+.actions-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.active { display: flex; }
+.modal { background: white; border-radius: 16px; padding: 24px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+.modal h2 { font-size: 1.25rem; margin-bottom: 16px; color: #111827; }
+.form-group { margin-bottom: 14px; }
+label { display: block; font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 4px; }
+input, textarea, select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; outline: none; font-family: inherit; }
+input:focus, textarea:focus, select:focus { border-color: #2563eb; }
+textarea { min-height: 60px; resize: vertical; }
+.option-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; }
+.option-row input { flex: 1; }
+.option-row .correct-badge { font-size: 0.75rem; color: #16a34a; font-weight: 600; min-width: 60px; text-align: center; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+.modal-actions .btn { flex: 1; }
+.loading { text-align: center; padding: 40px; color: #6b7280; }
+.spinner { border: 3px solid #e5e7eb; border-top: 3px solid #2563eb; border-radius: 50%; width: 32px; height: 32px; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #111827; color: white; padding: 12px 24px; border-radius: 8px; font-size: 0.875rem; z-index: 200; display: none; }
+.toast.show { display: block; animation: fadeInUp 0.3s; }
+@keyframes fadeInUp { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@media (max-width: 480px) {
+  .topbar { padding: 12px 16px; }
+  .topbar h1 { font-size: 1rem; }
+  .container { padding: 12px; }
+  .question-card { padding: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/dashboard">←</a>
+  <h1 id="bankTitle">Cargando...</h1>
+  <button class="btn btn-primary btn-sm" onclick="showAddQuestion()">+ Pregunta</button>
+</div>
+
+<div class="container" id="app">
+  <div id="bankInfo" class="bank-meta"></div>
+  <div id="shareInfo" style="margin-bottom:16px"></div>
+  <div id="questionsList"></div>
+</div>
+
+<div class="modal-overlay" id="questionModal">
+  <div class="modal">
+    <h2 id="questionModalTitle">Nueva pregunta</h2>
+
+    <div class="form-group">
+      <label>Pregunta</label>
+      <textarea id="qText" rows="2" placeholder="Escribí la pregunta..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Opciones</label>
+      <div id="optionsContainer">
+        <div class="option-row" data-idx="0">
+          <input class="qOption" placeholder="Opción A">
+          <span class="correct-badge">✓ Correcta</span>
+        </div>
+        <div class="option-row" data-idx="1">
+          <input class="qOption" placeholder="Opción B">
+          <span class="correct-badge"> </span>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="addOption()" style="margin-top:6px">+ Agregar opción</button>
+    </div>
+
+    <div class="form-group">
+      <label>Respuesta correcta</label>
+      <select id="qCorrect"></select>
+    </div>
+
+    <div class="form-group">
+      <label>Explicación (opcional)</label>
+      <textarea id="qExplanation" rows="2" placeholder="Explicación de la respuesta..."></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeQuestionModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveQuestion()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '/api';
+let bankId = new URLSearchParams(window.location.search).get('id');
+let bank = null;
+let questions = [];
+let editingQId = null;
+
+function getHeaders() {
+  const token = localStorage.getItem('token');
+  if (!token) { window.location.href = '/'; return {}; }
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+}
+
+async function loadBank() {
+  try {
+    const res = await fetch(API + '/banks/' + bankId, { headers: getHeaders() });
+    if (res.status === 401) { localStorage.clear(); window.location.href = '/'; return; }
+    if (res.status === 404) { document.getElementById('app').innerHTML = '<div class="empty">Banco no encontrado</div>'; return; }
+    const data = await res.json();
+    bank = data.bank;
+    questions = data.questions.map(q => ({ ...q, options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options }));
+    render();
+  } catch (err) {
+    document.getElementById('app').innerHTML = '<div class="empty">Error al cargar el banco</div>';
+  }
+}
+
+function render() {
+  document.getElementById('bankTitle').textContent = bank.title;
+  document.getElementById('bankInfo').innerHTML = `
+    <span>📄 ${questions.length} preguntas</span>
+    <span>🕐 ${new Date(bank.created_at).toLocaleDateString()}</span>
+  `;
+  document.getElementById('shareInfo').innerHTML = `
+    <button class="btn btn-outline btn-sm" onclick="copyShareCode()">📋 Código: <strong>${bank.share_code}</strong></button>
+    <button class="btn btn-outline btn-sm" onclick="exportJSON()">⬇ Exportar JSON</button>
+  `;
+
+  const list = document.getElementById('questionsList');
+  if (questions.length === 0) {
+    list.innerHTML = '<div class="empty">📝 No hay preguntas aún.<br><br><button class="btn btn-primary" onclick="showAddQuestion()">Agregar primera pregunta</button></div>';
+    return;
+  }
+  list.innerHTML = questions.map((q, i) => `
+    <div class="question-card">
+      <div class="question-text">${i + 1}. ${escHtml(q.question)}</div>
+      ${q.options.map((opt, oi) => `
+        <div class="option ${oi === q.correct ? 'option-correct' : 'option-wrong'}">
+          ${oi === q.correct ? '✓ ' : ''}${escHtml(opt)}
+        </div>
+      `).join('')}
+      ${q.explanation ? `<div class="explanation">💡 ${escHtml(q.explanation)}</div>` : ''}
+      <div class="question-actions">
+        <button class="btn btn-outline btn-sm" onclick="editQuestion(${q.id})">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteQuestion(${q.id})">Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showAddQuestion() {
+  editingQId = null;
+  document.getElementById('questionModalTitle').textContent = 'Nueva pregunta';
+  document.getElementById('qText').value = '';
+  document.getElementById('qExplanation').value = '';
+  document.getElementById('optionsContainer').innerHTML = `
+    <div class="option-row" data-idx="0">
+      <input class="qOption" placeholder="Opción A">
+      <span class="correct-badge">✓ Correcta</span>
+    </div>
+    <div class="option-row" data-idx="1">
+      <input class="qOption" placeholder="Opción B">
+      <span class="correct-badge"> </span>
+    </div>
+  `;
+  updateCorrectSelect();
+  document.getElementById('questionModal').classList.add('active');
+}
+
+function editQuestion(qid) {
+  const q = questions.find(x => x.id === qid);
+  if (!q) return;
+  editingQId = qid;
+  document.getElementById('questionModalTitle').textContent = 'Editar pregunta';
+  document.getElementById('qText').value = q.question;
+  document.getElementById('qExplanation').value = q.explanation || '';
+
+  document.getElementById('optionsContainer').innerHTML = q.options.map((opt, i) => `
+    <div class="option-row" data-idx="${i}">
+      <input class="qOption" placeholder="Opción ${String.fromCharCode(65 + i)}" value="${escHtml(opt)}">
+      <span class="correct-badge">${i === q.correct ? '✓ Correcta' : ''}</span>
+    </div>
+  `).join('');
+
+  updateCorrectSelect();
+  document.getElementById('qCorrect').value = q.correct;
+  document.getElementById('questionModal').classList.add('active');
+}
+
+function addOption() {
+  const container = document.getElementById('optionsContainer');
+  const idx = container.children.length;
+  const letter = String.fromCharCode(65 + idx);
+  const row = document.createElement('div');
+  row.className = 'option-row';
+  row.dataset.idx = idx;
+  row.innerHTML = `<input class="qOption" placeholder="Opción ${letter}"><span class="correct-badge"> </span>`;
+  container.appendChild(row);
+  updateCorrectSelect();
+}
+
+function updateCorrectSelect() {
+  const count = document.getElementById('optionsContainer').children.length;
+  const select = document.getElementById('qCorrect');
+  const currentVal = select.value;
+  select.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = 'Opción ' + String.fromCharCode(65 + i);
+    select.appendChild(opt);
+  }
+  if (currentVal >= 0 && currentVal < count) select.value = currentVal;
+}
+
+function closeQuestionModal() {
+  document.getElementById('questionModal').classList.remove('active');
+}
+
+async function saveQuestion() {
+  const question = document.getElementById('qText').value.trim();
+  const options = Array.from(document.querySelectorAll('.qOption')).map(inp => inp.value.trim());
+  const correct = parseInt(document.getElementById('qCorrect').value);
+  const explanation = document.getElementById('qExplanation').value.trim();
+
+  if (!question) { showToast('Escribí la pregunta'); return; }
+  if (options.length < 2 || options.some(o => !o)) { showToast('Completá todas las opciones'); return; }
+
+  const body = { question, options, correct, explanation };
+
+  try {
+    if (editingQId) {
+      await fetch(API + '/banks/' + bankId + '/questions/' + editingQId, {
+        method: 'PUT', headers: getHeaders(), body: JSON.stringify(body)
+      });
+    } else {
+      await fetch(API + '/banks/' + bankId + '/questions', {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify(body)
+      });
+    }
+    closeQuestionModal();
+    loadBank();
+  } catch (err) {
+    showToast('Error al guardar');
+  }
+}
+
+async function deleteQuestion(qid) {
+  if (!confirm('¿Eliminar esta pregunta?')) return;
+  try {
+    await fetch(API + '/banks/' + bankId + '/questions/' + qid, { method: 'DELETE', headers: getHeaders() });
+    loadBank();
+  } catch (err) {
+    showToast('Error al eliminar');
+  }
+}
+
+function copyShareCode() {
+  navigator.clipboard.writeText(bank.share_code).then(() => showToast('Código copiado: ' + bank.share_code));
+}
+
+async function exportJSON() {
+  try {
+    const res = await fetch(API + '/share/' + bank.share_code + '/export');
+    const data = await res.json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (bank.title || 'banco').replace(/[^a-zA-Z0-9]/g, '_') + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showToast('Error al exportar');
+  }
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function escHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+document.getElementById('questionModal').addEventListener('click', function(e) {
+  if (e.target === this) closeQuestionModal();
+});
+
+loadBank();
+</script>
+</body>
+</html>

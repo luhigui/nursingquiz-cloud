@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resultados - NursingQuiz Cloud</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f4f8; min-height: 100vh; }
+.topbar { background: white; padding: 16px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 10; }
+.topbar a { color: #2563eb; text-decoration: none; font-size: 1.5rem; line-height: 1; }
+.topbar h1 { font-size: 1.125rem; color: #111827; flex: 1; }
+.container { max-width: 800px; margin: 0 auto; padding: 20px; }
+.session-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); cursor: pointer; transition: box-shadow 0.2s; }
+.session-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.session-title { font-size: 1rem; font-weight: 600; color: #111827; }
+.session-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.8rem; color: #6b7280; margin-top: 6px; }
+.empty { text-align: center; padding: 60px 20px; color: #6b7280; }
+.empty p { margin-top: 8px; }
+.loading { text-align: center; padding: 40px; color: #6b7280; }
+.spinner { border: 3px solid #e5e7eb; border-top: 3px solid #2563eb; border-radius: 50%; width: 32px; height: 32px; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; text-decoration: none; display: inline-block; }
+.btn-outline { background: transparent; color: #374151; border: 1px solid #d1d5db; }
+.btn-outline:hover { background: #f3f4f6; }
+
+.detail-section { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.player-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
+.player-row:last-child { border-bottom: none; }
+.player-name { font-weight: 600; color: #111827; }
+.player-score { color: #2563eb; font-weight: 600; }
+.player-stats { font-size: 0.8rem; color: #6b7280; }
+.back-link { margin-bottom: 16px; display: inline-block; color: #2563eb; text-decoration: none; font-weight: 600; }
+@media (max-width: 480px) {
+  .topbar { padding: 12px 16px; }
+  .container { padding: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/dashboard">←</a>
+  <h1>Resultados de partidas</h1>
+</div>
+
+<div class="container" id="app">
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Cargando resultados...</p>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+
+function getHeaders() {
+  const token = localStorage.getItem('token');
+  if (!token) { window.location.href = '/'; return {}; }
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+}
+
+async function loadSessions() {
+  const container = document.getElementById('app');
+
+  try {
+    const res = await fetch(API + '/sessions', { headers: getHeaders() });
+    if (res.status === 401) { localStorage.clear(); window.location.href = '/'; return; }
+    const data = await res.json();
+    document.getElementById('loading').style.display = 'none';
+
+    if (data.sessions.length === 0) {
+      container.innerHTML = '<div class="empty"><p style="font-size:2rem">🎮</p><p><strong>No hay partidas aún</strong></p><p>Las partidas que juegues desde el NursingQuiz.exe aparecerán acá</p></div>';
+      return;
+    }
+
+    container.innerHTML = data.sessions.map(s => `
+      <div class="session-card" onclick="viewSession(${s.id})">
+        <div class="session-title">${s.title || s.bank_title || 'Partida sin título'}</div>
+        <div class="session-meta">
+          <span>🎮 ${s.mode}</span>
+          <span>👥 ${s.player_count} jugadores</span>
+          <span>🕐 ${new Date(s.played_at).toLocaleString()}</span>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    document.getElementById('loading').style.display = 'none';
+    container.innerHTML = '<div class="empty">Error al cargar resultados</div>';
+  }
+}
+
+async function viewSession(id) {
+  const container = document.getElementById('app');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Cargando...</p></div>';
+
+  try {
+    const res = await fetch(API + '/sessions/' + id, { headers: getHeaders() });
+    const data = await res.json();
+
+    const s = data.session;
+    let html = `<a class="back-link" onclick="loadSessions()" style="cursor:pointer">← Volver</a>`;
+
+    html += `<div class="detail-section">
+      <h2 style="margin-bottom:8px">${s.title || s.bank_title || 'Partida'}</h2>
+      <div style="font-size:0.875rem;color:#6b7280;margin-bottom:12px">
+        🎮 ${s.mode} · 👥 ${s.player_count} jugadores · 🕐 ${new Date(s.played_at).toLocaleString()}
+      </div>
+    </div>`;
+
+    html += `<div class="detail-section">
+      <h3 style="margin-bottom:12px">🏆 Resultados</h3>`;
+
+    const sorted = data.players.sort((a, b) => b.score - a.score);
+    sorted.forEach((p, i) => {
+      const pct = p.total > 0 ? Math.round((p.correct / p.total) * 100) : 0;
+      html += `<div class="player-row">
+        <div>
+          <div class="player-name">${i + 1}. ${escHtml(p.player_name)}</div>
+          <div class="player-stats">✅ ${p.correct}/${p.total} (${pct}%)</div>
+        </div>
+        <div class="player-score">${p.score} pts</div>
+      </div>`;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = '<div class="empty">Error al cargar la sesión</div>';
+  }
+}
+
+function escHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+loadSessions();
+</script>
+</body>
+</html>
